@@ -1,19 +1,20 @@
 /**
  * OrdersContext
  *
- * Deferred-persistence strategy:
- *  1. When an order is placed → saved to localStorage only (temp UUID as _id).
- *     Cart is cleared in DB at this point.
+ * Immediate-persistence strategy:
+ *  1. When an order is placed → POST /api/orders immediately (status: 'Order Received').
+ *     The real DB _id is stored in localStorage alongside order data.
+ *     Cart is cleared in DB at this point (via cartSessionId).
  *  2. Status simulation auto-advances (15s / step → ~60s total).
- *  3. When status reaches "Delivered" → POST /api/orders to persist to DB,
- *     then remove the local order from localStorage.
- *  4. My Orders page: active local orders (newest first) at top,
+ *  3. Each status step → PATCH /api/orders/:id/status to keep DB in sync.
+ *  4. On "Delivered", the local order is removed from localStorage.
+ *  5. My Orders page: active local orders (newest first) at top,
  *     historical DB orders below.
  */
 import {
   createContext, useContext, useState, useEffect, useCallback, useRef,
 } from 'react';
-import { fetchAllOrders, placeOrder } from '../services/orderService';
+import { fetchAllOrders, placeOrder, updateOrderStatus } from '../services/orderService';
 import { getSessionId } from '../utils/session';
 import { toast } from 'react-toastify';
 import logger from '../utils/logger';
@@ -45,36 +46,20 @@ export const OrdersProvider = ({ children }) => {
     logger.debug(`[OrdersContext] LS updated – ${localOrders.length} active orders`);
   }, [localOrders]);
 
-  // ── Persist a completed order to DB ─────────────────────────
-  const persistToDb = useCallback(async (order) => {
-    logger.info(`[OrdersContext] Persisting order ${order._id} to DB as Delivered`);
+  // ── Patch order status in DB ─────────────────────────────────
+  const patchStatusInDb = useCallback(async (dbId, status) => {
+    if (!dbId) return;
+    logger.info(`[OrdersContext] PATCH order ${dbId} → ${status}`);
     try {
-      const payload = {
-        customerName:  order.customerName,
-        phone:         order.phone,
-        address:       order.address,
-        city:          order.city,
-        state:         order.state,
-        zipCode:       order.zipCode,
-        paymentMethod: order.paymentMethod,
-        paymentStatus: order.paymentStatus,
-        status:        'Delivered',
-        // items have menuItem as the ObjectId string
-        items: order.items.map((i) => ({
-          menuItemId: i.menuItem?._id || i.menuItem,
-          quantity:   i.quantity,
-        })),
-      };
-      await placeOrder(payload);
-      logger.info(`[OrdersContext] Order ${order._id} saved to DB successfully`);
+      await updateOrderStatus(dbId, status);
     } catch (e) {
-      logger.error(`[OrdersContext] Failed to persist order ${order._id} to DB:`, e);
-      toast.error('⚠️ Could not sync your order to the server. Please contact support.');
+      logger.error(`[OrdersContext] Failed to patch order ${dbId} status to ${status}:`, e);
     }
   }, []);
 
   // ── Status simulation for a single order ────────────────────
-  const simulateStatus = useCallback((orderId, startStatus) => {
+  // orderId = localStorage key (_id), dbId = real MongoDB _id for PATCH calls
+  const simulateStatus = useCallback((orderId, dbId, startStatus) => {
     const startIdx = STATUS_FLOW.indexOf(startStatus);
     if (startIdx === -1 || startIdx === STATUS_FLOW.length - 1) return;
 
@@ -86,47 +71,70 @@ export const OrdersProvider = ({ children }) => {
       const tid = setTimeout(async () => {
         logger.info(`[OrdersContext] Order ${orderId} → ${nextStatus}`);
 
-        let orderSnapshot = null;
+        // Patch status in DB using real MongoDB _id
+        await patchStatusInDb(dbId, nextStatus);
 
         setLocalOrders((prev) => {
           const updated = prev.map((o) =>
             o._id === orderId ? { ...o, status: nextStatus } : o,
           );
-
           if (nextStatus === 'Delivered') {
-            // Grab a snapshot for DB persistence before removing from LS
-            orderSnapshot = updated.find((o) => o._id === orderId);
             logger.info(`[OrdersContext] Removing ${orderId} from LS after delivery`);
             return updated.filter((o) => o._id !== orderId);
           }
           return updated;
         });
-
-        if (nextStatus === 'Delivered' && orderSnapshot) {
-          await persistToDb(orderSnapshot);
-        }
       }, delay);
 
       timersRef.current[orderId].push(tid);
     });
-  }, [persistToDb]);
+  }, [patchStatusInDb]);
 
   // Re-attach simulators for orders that survived a page refresh
   useEffect(() => {
     localOrders.forEach((o) => {
       if (o.status !== 'Delivered' && o.status !== 'Cancelled') {
-        simulateStatus(o._id, o.status);
+        simulateStatus(o._id, o.dbId, o.status);
       }
     });
     return () => Object.values(timersRef.current).flat().forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally once on mount
 
-  // ── Add a new local order (called from CheckoutPage) ────────
-  const addLocalOrder = useCallback((order) => {
-    logger.info(`[OrdersContext] Adding local order: ${order._id}`);
-    setLocalOrders((prev) => [order, ...prev]);
-    simulateStatus(order._id, order.status || 'Order Received');
+  // ── Add a new local order: POST to DB immediately, then simulate ──
+  const addLocalOrder = useCallback(async (order, cartSessionId) => {
+    logger.info(`[OrdersContext] Placing order for ${order.customerName} – saving to DB now`);
+    let dbId = null;
+    try {
+      const payload = {
+        customerName:  order.customerName,
+        phone:         order.phone,
+        address:       order.address,
+        city:          order.city,
+        state:         order.state,
+        zipCode:       order.zipCode,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        status:        'Order Received',
+        cartSessionId,
+        items: order.items.map((i) => ({
+          menuItemId: i.menuItem?._id || i.menuItem,
+          quantity:   i.quantity,
+        })),
+      };
+      const saved = await placeOrder(payload);
+      dbId = saved._id;
+      logger.info(`[OrdersContext] Order saved to DB: ${dbId}`);
+    } catch (e) {
+      logger.error('[OrdersContext] Failed to save order to DB:', e);
+      toast.error('⚠️ Could not save your order. Please try again.');
+      throw e; // re-throw so CheckoutPage can handle it
+    }
+
+    const localOrder = { ...order, dbId };
+    setLocalOrders((prev) => [localOrder, ...prev]);
+    simulateStatus(order._id, dbId, order.status || 'Order Received');
+    return dbId;
   }, [simulateStatus]);
 
   // ── Retrieve a local order by ID ─────────────────────────────

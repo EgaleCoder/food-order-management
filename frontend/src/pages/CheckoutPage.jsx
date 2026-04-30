@@ -4,6 +4,7 @@ import { useCart } from '../context/CartContext';
 import { useOrders } from '../context/OrdersContext';
 import { toast } from 'react-toastify';
 import { validateCheckoutForm, validateField } from '../utils/checkoutValidation';
+import { getSessionId } from '../utils/session';
 import './CheckoutPage.css';
 import logger from '../utils/logger';
 
@@ -67,12 +68,12 @@ const CheckoutPage = () => {
     }
 
     setSubmitting(true);
-    logger.info('[CheckoutPage] Creating local order', { customerName: form.customerName });
+    logger.info('[CheckoutPage] Placing order', { customerName: form.customerName });
 
     try {
-      // Build a fully self-contained order object for localStorage
+      // Build a self-contained order object for localStorage tracking
       const tempOrder = {
-        _id:           crypto.randomUUID(),   // temp ID – replaced by DB _id on save
+        _id:           crypto.randomUUID(),   // local UUID – used as the LS key
         customerName:  form.customerName.trim(),
         phone:         form.phone.trim(),
         address:       form.address.trim(),
@@ -91,22 +92,27 @@ const CheckoutPage = () => {
         totalAmount,
         status:    'Order Received',
         createdAt: new Date().toISOString(),
-        _isLocal:  true,           // marker for OrdersContext / OrderPage
       };
 
-      // 1. Add to local orders (starts 60s simulation → persists to DB on Delivered)
-      addLocalOrder(tempOrder);
+      // 1. POST to DB immediately (also clears DB cart via cartSessionId)
+      //    addLocalOrder is now async and throws on failure
+      const cartSessionId = getSessionId();
+      await addLocalOrder(tempOrder, cartSessionId);
 
-      // 2. Clear cart in React state + DB
+      // 2. Clear cart in React state (DB cart already cleared by backend)
       clearCart();
 
-      logger.info(`[CheckoutPage] Local order created: ${tempOrder._id}`);
+      logger.info(`[CheckoutPage] Order placed, local tracking id: ${tempOrder._id}`);
       toast.success('🎉 Order placed! Tracking it live for you.');
 
       navigate(`/orders/${tempOrder._id}`);
     } catch (err) {
-      logger.error('[CheckoutPage] Unexpected error creating local order', err);
-      toast.error('Something went wrong. Please try again.');
+      logger.error('[CheckoutPage] Failed to place order', err);
+      // Toast is already shown by OrdersContext; only show a generic one for
+      // unexpected errors that weren't thrown from addLocalOrder
+      if (!err?.isAxiosError) {
+        toast.error('Something went wrong. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
