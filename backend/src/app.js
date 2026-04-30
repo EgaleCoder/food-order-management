@@ -12,8 +12,14 @@ const orderRoutes = require('./routes/orderRoutes');
 const app = express();
 
 // Middleware
-// Enable CORS for all routes
-app.use(cors());
+// Configure CORS for frontend deployment (Netlify)
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+app.use(cors(corsOptions));
 // Parse JSON and URL-encoded data
 app.use(express.json());
 // Parse URL-encoded data with extended option
