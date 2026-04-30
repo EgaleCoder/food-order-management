@@ -1,5 +1,6 @@
 // Cart service: Handles cart operations like add/update/remove items, clear cart, etc.
 const Cart = require('../models/cartModel');
+const logger = require('../utils/logger');
 
 
 // Get or create a cart for a session 
@@ -17,7 +18,7 @@ const getCart = async (sessionId) => {
 // If the item already exists, increment quantity by the given qty (default 1).
 
 const addItem = async (sessionId, { menuItemId, name, price, imageUrl, quantity = 1 }) => {
-  console.log(`[cartService] addItem: ${name} (x${quantity}) to session ${sessionId}`);
+  logger.info(`[cartService] addItem: ${name} (x${quantity}) to session ${sessionId}`);
   const cart = await getCart(sessionId);
 
   const existing = cart.items.find((i) => i.menuItem.toString() === menuItemId);
@@ -31,7 +32,7 @@ const addItem = async (sessionId, { menuItemId, name, price, imageUrl, quantity 
 
 // Update quantity of an item. Removes item if qty <= 0
 const updateItem = async (sessionId, menuItemId, quantity) => {
-  console.log(`[cartService] updateItem: ${menuItemId} → qty ${quantity} for session ${sessionId}`);
+  logger.info(`[cartService] updateItem: ${menuItemId} → qty ${quantity} for session ${sessionId}`);
   const cart = await getCart(sessionId);
 
   if (quantity <= 0) {
@@ -45,7 +46,7 @@ const updateItem = async (sessionId, menuItemId, quantity) => {
 
 // Remove a single item from the cart
 const removeItem = async (sessionId, menuItemId) => {
-  console.log(`[cartService] removeItem: ${menuItemId} from session ${sessionId}`);
+  logger.info(`[cartService] removeItem: ${menuItemId} from session ${sessionId}`);
   const cart = await getCart(sessionId);
   cart.items = cart.items.filter((i) => i.menuItem.toString() !== menuItemId);
   return cart.save();
@@ -53,7 +54,7 @@ const removeItem = async (sessionId, menuItemId) => {
 
 // Clear all items from the cart
 const clearCart = async (sessionId) => {
-  console.log(`[cartService] clearCart: session ${sessionId}`);
+  logger.info(`[cartService] clearCart: session ${sessionId}`);
   return Cart.findOneAndUpdate(
     { sessionId },
     { items: [] },

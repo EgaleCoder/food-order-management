@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const logger = require('./utils/logger');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
 
 // Import routes
@@ -20,7 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // HTTP request logger middleware
 app.use((req, _res, next) => {
-  console.log(`[HTTP] ${req.method} ${req.originalUrl}`);
+  logger.info(`[HTTP] ${req.method} ${req.originalUrl}`);
   next();
 });
 
@@ -31,7 +32,7 @@ app.use('/api/v1/orders', orderRoutes);
 
 // Health check
 app.get('/api/v1/health', (req, res) => {
-  console.log('[HTTP] Health check requested');
+  logger.info('[HTTP] Health check requested');
   res.json({ status: 'OK', message: 'Server is running' });
 });
 

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
+const logger = require('./utils/logger');
 const MenuItem = require('./models/menuItemModel');
 const foodItems = require('./data/foodItems.json');
 
@@ -18,10 +19,10 @@ const importData = async () => {
     // Insert new seed data
     await MenuItem.insertMany(foodItems);
 
-    console.log('Data Imported Successfully!');
+    logger.info('Data Imported Successfully!');
     process.exit();
   } catch (error) {
-    console.error(`Error with data import: ${error.message}`);
+    logger.error(`Error with data import: ${error.message}`);
     process.exit(1);
   }
 };
@@ -31,10 +32,10 @@ const destroyData = async () => {
     // Clear existing menu items
     await MenuItem.deleteMany();
 
-    console.log('Data Destroyed Successfully!');
+    logger.info('Data Destroyed Successfully!');
     process.exit();
   } catch (error) {
-    console.error(`Error with data destruction: ${error.message}`);
+    logger.error(`Error with data destruction: ${error.message}`);
     process.exit(1);
   }
 };
