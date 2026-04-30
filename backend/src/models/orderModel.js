@@ -34,7 +34,8 @@ const orderSchema = new mongoose.Schema(
         city: { type: String, required: true, trim: true },
         state: { type: String, required: true, trim: true },
         zipCode: { type: Number, required: true, trim: true },
-      }
+      },
+      required: true,
     },
     paymentMethod: { type: String, required: true, trim: true },
     paymentStatus: { type: String, required: true, trim: true },
