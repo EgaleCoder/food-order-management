@@ -5,6 +5,11 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // IMPORTANT: Enable Netlify deploy proxy headers
+  proxy: {
+    host: 'localhost',
+    port: 5000
+  }
 });
 
 // Request interceptor
