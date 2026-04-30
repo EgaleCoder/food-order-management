@@ -5,6 +5,7 @@ const { errorHandler, notFound } = require('./middlewares/errorHandler');
 // Import routes
 const menuRoutes = require('./routes/menuRoutes');
 const cartRoutes = require('./routes/cartRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 
 // Create Express app
 const app = express();
@@ -26,6 +27,7 @@ app.use((req, _res, next) => {
 // Routes
 app.use('/api/v1/menu', menuRoutes);
 app.use('/api/v1/cart', cartRoutes);
+app.use('/api/v1/orders', orderRoutes);
 
 // Health check
 app.get('/api/v1/health', (req, res) => {
