@@ -68,7 +68,11 @@ const OrderCard = ({ order, isLive = false }) => {
           </div>
           <div className="my-orders-card__info-row">
             <span className="my-orders-card__info-label">Address</span>
-            <span>{order.address}, {order.city}, {order.state} – {order.zipCode}</span>
+            <span>
+              {order.shippingAddress
+                ? `${order.shippingAddress.street}, ${order.shippingAddress.city}, ${order.shippingAddress.state} – ${order.shippingAddress.zipCode}`
+                : `${order.address}, ${order.city}, ${order.state} – ${order.zipCode}`}
+            </span>
           </div>
           <div className="my-orders-card__info-row">
             <span className="my-orders-card__info-label">Payment</span>

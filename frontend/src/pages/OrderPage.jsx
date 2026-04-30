@@ -125,7 +125,11 @@ const OrderPage = () => {
         <div className="order-page__info-grid">
           <div><span className="order-page__info-label">Name</span><span>{order.customerName}</span></div>
           <div><span className="order-page__info-label">Phone</span><span>{order.phone}</span></div>
-          <div><span className="order-page__info-label">Address</span><span>{order.address}, {order.city}, {order.state} – {order.zipCode}</span></div>
+          <div><span className="order-page__info-label">Address</span><span>
+            {order.shippingAddress
+              ? `${order.shippingAddress.street}, ${order.shippingAddress.city}, ${order.shippingAddress.state} – ${order.shippingAddress.zipCode}`
+              : `${order.address}, ${order.city}, ${order.state} – ${order.zipCode}`}
+          </span></div>
           <div><span className="order-page__info-label">Payment</span><span>{order.paymentMethod} ({order.paymentStatus})</span></div>
         </div>
       </div>
