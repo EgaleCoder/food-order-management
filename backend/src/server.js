@@ -3,6 +3,7 @@ const app = require('./app');
 const connectDB = require('./config/db');
 const PORT = process.env.PORT || 5000;
 
+// Start the server after establishing database connection
 const startServer = async () => {
   try {
     await connectDB();
@@ -16,4 +17,5 @@ const startServer = async () => {
   }
 };
 
+// Handle unhandled promise rejections
 startServer();
