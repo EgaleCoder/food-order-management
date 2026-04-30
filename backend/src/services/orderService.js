@@ -55,10 +55,12 @@ const createOrder = async (data) => {
     totalAmount,
     customerName,
     phone,
-    address,
-    city,
-    state,
-    zipCode,
+    shippingAddress: {
+      street:  address,
+      city,
+      state,
+      zipCode,
+    },
     paymentMethod,
     paymentStatus,
   };
